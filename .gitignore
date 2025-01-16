@@ -1,0 +1,71 @@
+# .gitignore
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build output
+dist/
+build/
+coverage/
+
+# Runtime data
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.test
+.env.production
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# CloudPanel specific
+/home/clp/backups/*
+!/home/clp/backups/.gitkeep
+/home/clp/logs/*
+!/home/clp/logs/.gitkeep
+/home/clp/htdocs/app/data/*.sq3-journal
+/home/clp/htdocs/app/data/*.sq3-wal
+/home/clp/htdocs/app/data/db.sq3
+
+# Testing
+coverage/
+.nyc_output/
+junit.xml
+
+# Documentation
+docs/
+swagger-static/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+tmp/
+
+# SSL certificates and keys
+*.pem
+*.key
+*.crt
+*.csr
+*.srl
+*.der
+*.pfx
+*.p12
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
