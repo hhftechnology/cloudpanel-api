@@ -70,9 +70,7 @@ cloudpanel-api/
 │   └── loki/
 │       └── loki-config.yml
 │
-├── scripts/               # Utility scripts
-│   ├── setup.sh
-│   └── backup.sh
+├── cloudpanel-scripts/               # Utility scripts
 │
 ├── tests/                # Test files
 │   ├── unit/
@@ -219,3 +217,97 @@ Request:
   "details": {} // Optional additional information
 }
 ```
+
+When someone makes a request to create a site through the API endpoint (e.g., POST /api/v1/sites), here's what happens:
+
+First, the API route handler in `/src/routes/v1/sites.js` receives the request:
+
+```javascript
+router.post('/', async (req, res) => {
+    try {
+        // Create an operation record in the database
+        const operationId = await db.run(`
+            INSERT INTO operations (
+                type, data, status, source, created_at
+            ) VALUES (
+                'site.create',
+                ?, 
+                'pending',
+                'api',
+                datetime('now')
+            )
+        `, [JSON.stringify(req.body)]);
+
+        // Return immediate response with operation ID
+        res.status(202).json({
+            success: true,
+            operation_id: operationId,
+            message: 'Operation queued'
+        });
+    } catch (error) {
+        // Error handling...
+    }
+});
+```
+
+Meanwhile, we have two systemd services running continuously:
+
+1. The queue worker (`queue_worker.sh`), which checks for new operations:
+```bash
+while true; do
+    # Query for pending operations
+    pending_ops=$(sqlite3 /home/clp/htdocs/app/data/db.sq3 "
+        SELECT id, type 
+        FROM operations 
+        WHERE status = 'pending' 
+        AND source = 'api'
+        ORDER BY created_at ASC
+    ")
+    
+    if [[ -n "$pending_ops" ]]; then
+        # Process each operation...
+    fi
+    sleep 5
+done
+```
+
+2. The status monitor (`status_monitor.sh`), which watches for problems:
+```bash
+while true; do
+    # Check for stuck or timed out operations
+    check_stuck_operations
+    check_timed_out_operations
+    sleep 60
+done
+```
+
+So when a site creation request comes in:
+
+1. API creates 'pending' operation in database
+2. Queue worker sees new operation within 5 seconds
+3. Queue worker runs appropriate script (e.g., `manage_site.sh create $operation_id`)
+4. Script processes operation and updates status to 'completed' or 'failed'
+5. Status monitor ensures nothing gets stuck
+
+The client can poll the operation status endpoint to track progress:
+```javascript
+router.get('/operations/:id', async (req, res) => {
+    const operation = await db.get(`
+        SELECT status, error, result 
+        FROM operations 
+        WHERE id = ?
+    `, [req.params.id]);
+    
+    res.json({
+        success: true,
+        data: operation
+    });
+});
+```
+
+This architecture gives us:
+- Immediate API responses (non-blocking)
+- Reliable operation processing
+- Status tracking
+- Error handling
+- Separation from UI operations
