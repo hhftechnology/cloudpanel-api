@@ -1,0 +1,16 @@
+# /etc/systemd/system/cloudpanel-queue.service
+[Unit]
+Description=CloudPanel Operation Queue Worker
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/home/clp/scripts/orchestrator/queue_worker.sh
+Restart=always
+RestartSec=5
+StandardOutput=append:/home/clp/logs/orchestrator/queue.log
+StandardError=append:/home/clp/logs/orchestrator/queue.error.log
+
+[Install]
+WantedBy=multi-user.target
