@@ -250,7 +250,7 @@ router.post('/', async (req, res) => {
 });
 ```
 
-Meanwhile, we have two systemd services running continuously:
+Meanwhile, i have two systemd services running continuously:
 
 1. The queue worker (`queue_worker.sh`), which checks for new operations:
 ```bash
@@ -311,3 +311,77 @@ This architecture gives us:
 - Status tracking
 - Error handling
 - Separation from UI operations
+
+Still working on
+UI API Script triger challange. The key is to create a distinction layer betien UI and API operations in CloudPanel.
+
+The first step is to modify our core operation tracking in the database. When an operation comes in via the API, it should be tagged as an API operation. I can do this by adding a `source` column to our operations table:
+
+```sql
+ALTER TABLE operations ADD COLUMN source VARCHAR(10) DEFAULT 'ui';
+```
+
+Then, I need to modify how our scripts check whether they should execute. the core database.sh script to include this check:
+
+```bash
+# Function to check if operation should be handled by scripts
+should_handle_operation() {
+    local operation_id=$1
+    
+    local source=$(sqlite3 /home/clp/htdocs/app/data/db.sq3 "
+        SELECT source 
+        FROM operations 
+        WHERE id = $operation_id
+    ")
+    
+    # Only handle operations that came from the API
+    [[ "$source" == "api" ]]
+}
+```
+
+Now I can modify each of my handler scripts to use this check. For example, in manage_site.sh:
+
+```bash
+# Main execution function
+main() {
+    OPERATION_ID=$2
+    local operation=$1
+    
+    # First check if i should handle this operation
+    if ! should_handle_operation $OPERATION_ID; then
+        log_message "Operation $OPERATION_ID is not an API operation - skipping"
+        exit 0
+    fi
+    
+    # Rest of the script continues as before...
+```
+
+For the API side, i need to ensure operations are properly tagged. When creating an operation through the API, i'll set the source:
+
+```bash
+create_operation() {
+    local type=$1
+    local data=$2
+    
+    sqlite3 /home/clp/htdocs/app/data/db.sq3 "
+        INSERT INTO operations (
+            type, data, status, source, created_at
+        ) VALUES (
+            '$type',
+            '$data',
+            'pending',
+            'api',
+            datetime('now')
+        )
+    "
+}
+```
+
+This approach allows UI operations to continue using CloudPanel's built-in functionality while API operations go through our script system. This separation solves my chalanges:
+
+1. No interference with existing UI operations
+2. Clear tracking of operation sources
+3. Easy to maintain and debug
+4. No risk of duplicate operations
+
+The queue worker and status monitor will naturally only process API operations since they'll inherit this check through the core database functions.
