@@ -1,0 +1,27 @@
+# /etc/systemd/system/cloudpanel-api.service
+[Unit]
+Description=CloudPanel API Service
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=clp
+WorkingDirectory=/home/clp/api
+ExecStart=/usr/bin/node src/app.js
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/clp/logs/api/output.log
+StandardError=append:/home/clp/logs/api/error.log
+Environment=NODE_ENV=production
+
+# Security configurations
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadOnlyDirectories=/
+ReadWriteDirectories=/home/clp/api/logs
+ReadWriteDirectories=/home/clp/api/tmp
+
+[Install]
+WantedBy=multi-user.target
